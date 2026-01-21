@@ -6,6 +6,8 @@ python perf_takehome.py Tests.test_kernel_cycles # goal is under 1487 cycles
 python reports/generate_report.py # REPORT.md
 ```
 
+changing the test or the simulator (eg N_CORES) os cheating
+
 if considering improvements:
 - consider REPORT.md
 - maintain IDEAS.md (can be used as a brainstorm and a to do list)
