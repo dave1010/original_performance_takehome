@@ -82,6 +82,16 @@ def analyze_bundle_mix(instrs: list[dict]) -> dict[str, object]:
     }
 
 
+def summarize_ready_stats(ready_stats: list[dict[str, int]]) -> dict[str, float]:
+    if not ready_stats:
+        return {engine: 0.0 for engine in SLOT_LIMITS}
+    totals = {engine: 0 for engine in SLOT_LIMITS}
+    for cycle in ready_stats:
+        for engine in SLOT_LIMITS:
+            totals[engine] += cycle.get(engine, 0)
+    return {engine: totals[engine] / len(ready_stats) for engine in SLOT_LIMITS}
+
+
 def main() -> None:
     forest_height = 10
     rounds = 16
@@ -95,6 +105,7 @@ def main() -> None:
     kb.build_kernel(forest.height, len(forest.values), len(inp.indices), rounds)
     stats = analyze_program(kb.instrs)
     bundle_mix = analyze_bundle_mix(kb.instrs)
+    ready_stats = summarize_ready_stats(getattr(kb, "ready_stats", []))
 
     machine = Machine(mem, kb.instrs, kb.debug_info(), n_cores=N_CORES)
     for _ in reference_kernel2(mem, {}):
@@ -165,6 +176,13 @@ def main() -> None:
     )
     lines.append(
         f"- Avg load slots when valu>0: {avg_load_when_valu:.2f}"
+    )
+    lines.append("")
+    lines.append("## Ready-ops summary")
+    lines.append("")
+    lines.append(
+        "- Avg ready ops per cycle: "
+        + ", ".join(f"{engine}={ready_stats[engine]:.2f}" for engine in ENGINE_ORDER if engine in ready_stats)
     )
     lines.append("")
     lines.append("## Notes")
