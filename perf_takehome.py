@@ -159,64 +159,6 @@ class KernelBuilder:
             for i in range(0, len(slots), SLOT_LIMITS["load"]):
                 emit(load=slots[i : i + SLOT_LIMITS["load"]])
 
-        def emit_hash_update(block_idx):
-            emit_valu_chunks(
-                [("^", val_vecs[block_idx], val_vecs[block_idx], node_vecs[block_idx])]
-            )
-            for stage, (op1, _, op2, op3, _) in enumerate(HASH_STAGES):
-                # Hash stages stay fully vectorized (valu) with vectorized constants.
-                emit_valu_chunks(
-                    [
-                        (
-                            op1,
-                            tmp1_vecs[block_idx],
-                            val_vecs[block_idx],
-                            hash_const1[stage],
-                        )
-                    ]
-                    + [
-                        (
-                            op3,
-                            tmp2_vecs[block_idx],
-                            val_vecs[block_idx],
-                            hash_const3[stage],
-                        )
-                    ]
-                )
-                emit_valu_chunks(
-                    [
-                        (
-                            op2,
-                            val_vecs[block_idx],
-                            tmp1_vecs[block_idx],
-                            tmp2_vecs[block_idx],
-                        )
-                    ]
-                )
-            emit_valu_chunks(
-                [("&", parity_vecs[block_idx], val_vecs[block_idx], v_one)]
-            )
-            emit_valu_chunks(
-                [("+", choice_vecs[block_idx], parity_vecs[block_idx], v_one)]
-            )
-            emit_valu_chunks(
-                [
-                    (
-                        "multiply_add",
-                        idx_vecs[block_idx],
-                        idx_vecs[block_idx],
-                        v_two,
-                        choice_vecs[block_idx],
-                    )
-                ]
-            )
-            emit_valu_chunks(
-                [("<", mask_vecs[block_idx], idx_vecs[block_idx], v_n_nodes)]
-            )
-            emit_valu_chunks(
-                [("*", idx_vecs[block_idx], idx_vecs[block_idx], mask_vecs[block_idx])]
-            )
-
         blocks = per_core // VLEN
         group_size = 6
         block_offsets = [self.alloc_scratch(f"block_offset_{i}") for i in range(group_size)]
@@ -260,17 +202,55 @@ class KernelBuilder:
                     ]
                 )
             for _ in range(rounds):
-                for i in range(group):
-                    emit_valu_chunks(
-                        [("+", addr_vecs[i], idx_vecs[i], v_forest_base)]
+                emit_valu_chunks(
+                    [("+", addr_vecs[i], idx_vecs[i], v_forest_base) for i in range(group)]
+                )
+                for lane in range(VLEN):
+                    emit_load_chunks(
+                        [
+                            ("load_offset", node_vecs[i], addr_vecs[i], lane)
+                            for i in range(group)
+                        ]
                     )
-                    for lane in range(VLEN):
-                        emit_load_chunks(
-                            [("load_offset", node_vecs[i], addr_vecs[i], lane)]
-                        )
-                    if i > 0:
-                        emit_hash_update(i - 1)
-                emit_hash_update(group - 1)
+                emit_valu_chunks(
+                    [("^", val_vecs[i], val_vecs[i], node_vecs[i]) for i in range(group)]
+                )
+                for stage, (op1, _, op2, op3, _) in enumerate(HASH_STAGES):
+                    # Hash stages stay fully vectorized (valu) with vectorized constants.
+                    emit_valu_chunks(
+                        [
+                            (op1, tmp1_vecs[i], val_vecs[i], hash_const1[stage])
+                            for i in range(group)
+                        ]
+                        + [
+                            (op3, tmp2_vecs[i], val_vecs[i], hash_const3[stage])
+                            for i in range(group)
+                        ]
+                    )
+                    emit_valu_chunks(
+                        [
+                            (op2, val_vecs[i], tmp1_vecs[i], tmp2_vecs[i])
+                            for i in range(group)
+                        ]
+                    )
+                emit_valu_chunks(
+                    [("&", parity_vecs[i], val_vecs[i], v_one) for i in range(group)]
+                )
+                emit_valu_chunks(
+                    [("+", choice_vecs[i], parity_vecs[i], v_one) for i in range(group)]
+                )
+                emit_valu_chunks(
+                    [
+                        ("multiply_add", idx_vecs[i], idx_vecs[i], v_two, choice_vecs[i])
+                        for i in range(group)
+                    ]
+                )
+                emit_valu_chunks(
+                    [("<", mask_vecs[i], idx_vecs[i], v_n_nodes) for i in range(group)]
+                )
+                emit_valu_chunks(
+                    [("*", idx_vecs[i], idx_vecs[i], mask_vecs[i]) for i in range(group)]
+                )
             for i in range(group):
                 emit(
                     store=[

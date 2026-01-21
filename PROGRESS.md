@@ -16,3 +16,4 @@
 - Dropped unused zero broadcast constant — 4508 cycles (python perf_takehome.py Tests.test_kernel_cycles).
 - Added a dependency-aware, cross-engine scheduler to pack ready load/valu/alu/store slots into the same bundles while respecting scratch/memory hazards and pause barriers, replacing phase-based emission with mixed bundles — 2620 cycles (python perf_takehome.py Tests.test_kernel_cycles).
 - Added a per-block hash/update helper and restructured the round loop to interleave each block’s gather with the previous block’s hash/update stage for explicit software pipelining across blocks — 2680 cycles (python perf_takehome.py Tests.test_kernel_cycles).
+- Reverted the per-block software pipelining change after the regression — 2620 cycles (python perf_takehome.py Tests.test_kernel_cycles).
