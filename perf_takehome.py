@@ -334,7 +334,7 @@ class KernelBuilder:
                         pass
             return reads, writes
 
-        def schedule_segment(segment_ops):
+        def schedule_segment(segment_ops, ready_stats):
             reads_list = []
             writes_list = []
             deps = [set() for _ in segment_ops]
@@ -376,6 +376,13 @@ class KernelBuilder:
             scheduled = [False] * len(segment_ops)
 
             while ready_all:
+                ready_stats.append(
+                    {
+                        engine: len(queue)
+                        for engine, queue in ready.items()
+                        if engine in SLOT_LIMITS
+                    }
+                )
                 instr = {}
                 taken = set()
                 for engine in ["load", "valu", "alu", "store", "flow", "debug"]:
@@ -412,17 +419,19 @@ class KernelBuilder:
             return instrs
 
         instrs = []
+        ready_stats = []
         segment = []
         for engine, slot in ops:
             if engine == "flow" and slot and slot[0] == "pause":
                 if segment:
-                    instrs.extend(schedule_segment(segment))
+                    instrs.extend(schedule_segment(segment, ready_stats))
                     segment = []
                 instrs.append({"flow": [slot]})
             else:
                 segment.append((engine, slot))
         if segment:
-            instrs.extend(schedule_segment(segment))
+            instrs.extend(schedule_segment(segment, ready_stats))
+        self.ready_stats = ready_stats
         return instrs
 
 BASELINE = 147734

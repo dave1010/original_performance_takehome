@@ -82,6 +82,10 @@
 - Avg valu slots when load>0: 5.16
 - Avg load slots when valu>0: 1.62
 
+## Ready-ops summary
+
+- Avg ready ops per cycle: alu=0.04, valu=5.32, load=6.46, store=0.02, flow=0.00, debug=0.00
+
 ## Notes
 - Slot utilization is derived from static instruction bundles vs. measured cycles.
 - Debug slots are tracked but do not contribute to cycles in the simulator.
